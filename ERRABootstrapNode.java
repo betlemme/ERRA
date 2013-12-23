@@ -31,7 +31,9 @@ public class ERRABootstrapNode {
 			server = new ServerSocket(10000);
 		} catch (IOException e) {
 			System.err.println("Problem creating this node's server");
-		}	while (true) {
+		}	
+
+		while (true) {
 			System.out.println("Waiting for packets");
 			Socket inputSocket = null;
 			try {
