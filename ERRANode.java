@@ -54,12 +54,12 @@ public class ERRANode {
         	if (args.length == 0)
                         System.err.println("Specify the bootstrap address");
                 else if (args.length == 1) {
-                        ERRANode nodo = new ERRANode(args[0]);
-                        nodo.waitForMessage();
+                        ERRANode node = new ERRANode(args[0]);
+                        node.waitForMessage();
                 		}
                 	else {
-                		ERRANode nodo = new ERRANode(args[0], args[1]);
-                		nodo.waitForMessage();
+                		ERRANode node = new ERRANode(args[0], args[1]);
+                		node.waitForMessage();
                 	}
         }
 
@@ -77,13 +77,13 @@ public class ERRANode {
 	}
 
 	private void waitForMessage() {
-    	String nome ="";
+    	String name ="";
     	Scanner in = new Scanner(System.in);
     	
-    	while (!(nome.equals("/logout"))) {
+    	while (!(name.equals("/logout"))) {
     		System.out.print("Nome file da mandare (/logout per disconnettersi): ");
-    		nome = in.nextLine();
-    		sendFile(nome);
+    		name = in.nextLine();
+    		sendFile(name);
     	}
     	
     	in.close();
