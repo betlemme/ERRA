@@ -210,5 +210,159 @@ public class ERRANode {
 		outputSocket.close();
 		System.out.println("Packet forwarded");
 	}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    	//questo metodo interroga bootstrap che gli restituisce un ArrayList 
+        //di Inetadress da visitare, con l'inetaddress destinazione in posizione 0
+        //INCOMPLETO
+        private ArrayList<InetAddress> requiredAddList(InetAddress address) {
+        	ArrayList<InetAddress> route = null;
+        	
+        //
+        	
+        	
+        return route;	
+        }	       
+        
+        /*data una lista "route" di inetadress da visitare e un file, lo forwarda al prossimo indirizzo
+         * della lista "route":
+         *  attraverso ObjectOutputStream prima mando il file, poi la lista rimanente route */
+    	private void forward(ArrayList<InetAddress> route, File file) throws IOException {
+    		// in posizione 0 c'è la destinazione, per trovare indirizzo nodo seguente faccio "POP" 
+    		InetAddress nextNode = route.remove(route.size()-1); 
+    		Socket socket = null;
+    		try {
+    	          socket = new Socket(nextNode, 10000);
+    	      } catch (UnknownHostException e) {
+    	          e.printStackTrace();
+    	      } catch (IOException e) {
+    	          e.printStackTrace();
+    	      }
+    		//invio il MSG
+    		ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+    	    oos.reset();
+    	    oos.writeObject(file);
+    	    oos.flush();
+    	    //invio l'arraylist route, che ho decrementato di 1 prima
+    	    oos.reset();
+    	    oos.writeObject(file);
+    	    oos.flush();
+    	    
+    	    oos.close();
+    	    
+    		
+    		
+    	}
+    	
+    	
+    	
+        /*a partire dalla stringa del nome del file, ricavo File e InetAdress,
+         * per poter invocare requiredAddList e quindi forwardare lista "route" e file  */
+        private void send(String nome) throws IOException {
+        	File file = new File(nome);
+        	InetAddress inetAdd = InetAddress.getByName(nome);
+        	ArrayList<InetAddress> route = requiredAddList(inetAdd);
+        	forward(route, file);
+        }
+
+
+        /*crea il serversocket multithread che sfrutta la classe privata runnable ReceiverManager
+        per ricevere il File inviato e la corrispondente lista "route"*/
+        // INCOMPLETO NON RICEVE ArrayList<InetAddress> route.. se po fa?
+        private void listeningServer() throws IOException {
+        	
+        	ServerSocket ss = new ServerSocket(10000);
+            System.out.println("Sono sulla " + ss);
+       
+            // ciclo infinito per accettare per sempre connessioni
+            for (;;) {
+                // prendo la connessione in ingresso
+                Socket s = ss.accept();
+                System.out.println("Conessione da " + s);
+       
+                // creo ed eseguo il thread per questa connessione 
+                // cosi il ciclo continua e rimane in attesa di 
+                // nuove connessioni
+                new ReceiverManager(s).run();
+       
+                // faccio respirare un po il ciclo
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) { }
+            }
+ 
+        }
+        
+        private class ReceiverManager implements Runnable {
+        	 
+        	  private final String SAVE_DIR = "/home/crx/uploads";
+        	 
+        	  private Socket socket;
+        	 
+        	  public ReceiverManager(Socket socket) {
+        	      this.socket = socket;
+        	  }
+        	 
+        	  public void run() {
+        	      try {
+        	          System.out.println("presa in carico nuova connessione da " + socket);
+        	 
+        	          // intercetto il file in arrivo
+        	          ObjectInputStream oin = new ObjectInputStream(socket.getInputStream());
+        	 
+        	          // eseguo un cast dell' oggetto come file
+        	          File inFile = (File) oin.readObject();
+        	 
+        	          // imposto il nuovo file che dovro' salvare
+        	          // prendendone il nome originale
+        	          File saveFile = new File(SAVE_DIR + "/" + inFile.getName());
+        	 
+        	          // salvo il file ===> l'azione di visita salva il file transitato per quel nodo
+        	          save(inFile, saveFile);
+        	          
+        	          //ora eseguo il cast si arraylist<InetAddress>
+        	          ArrayList<InetAddress> route = (ArrayList<InetAddress>) oin.readObject();
+        	          
+        	 
+        	      } catch (Exception e) {
+        	          e.printStackTrace();
+        	      } finally {
+        	          try {
+        	              socket.close();
+        	          } catch (IOException e) { }
+        	      }
+        	  }
+        	 
+        	  /**
+        	   * Esegue il salvattaggio 
+        	   *
+        	   * @param in
+        	   * @param out
+        	   * @throws IOException
+        	   */
+        	  private void save(File in, File out) throws IOException {
+        	      System.out.println(" --ricezione file " + in.getName());
+        	      System.out.println(" --dimensione file " + in.length());
+        	 
+        	      // apro uno stream sul file che e' stato inviato
+        	      FileInputStream fis  = new FileInputStream(in);
+        	      // scrivo uno stram per il salvataccio del nuovo file
+        	      FileOutputStream fos = new FileOutputStream(out);
+        	 
+        	      byte[] buf = new byte[1024];
+        	      int i = 0;
+        	      // riga per riga leggo il file originale per 
+        	      // scriverlo nello stram del file destinazione
+        	      while((i=fis.read(buf))!=-1) {
+        	          fos.write(buf, 0, i);
+        	      }
+        	      // chiudo gli strams
+        	      fis.close();
+        	      fos.close();
+        	 
+        	      System.out.println(" --ricezione completata");
+        	  }
+        	}
+
+
 
 }
