@@ -28,15 +28,11 @@ Pacchetto di risposta dal bootstrap che indica che il nodo destinazione richiest
 */
 
 
-/*
-Il programma può essere fatto partire con
-	java ERRANode <indirizzo bootstrap>
-oppure
-	java ERRANode <indirizzo bootstrap> <file da inviare>
-*/
+// Il programma viene fatto partire con "java ERRANode <indirizzo bootstrap>"
 
 import java.net.*;
 import java.io.*;
+import java.util.Scanner;
 
 public class ERRANode {
 
@@ -46,38 +42,22 @@ public class ERRANode {
 	private static final int BOOTSTRAP_RESPONSE_SUCCESS_CODE = 254;
 	private static final int BOOTSTRAP_RESPONSE_ERROR_CODE = 255;
 
-	private String bootstrapAddress;
+	private static String bootstrapAddress;
 
-	public static void main(String[] args) {
-            
+	public static void main(String[] args) {          
         	
-        	if (args.length == 0)
-                        System.err.println("Specify the bootstrap address");
-                else if (args.length == 1) {
-                        ERRANode node = new ERRANode(args[0]);
-                        node.waitForMessage();
-                		}
-                	else {
-                		ERRANode node = new ERRANode(args[0], args[1]);
-                		node.waitForMessage();
-                	}
-        }
-
-	public ERRANode(String bootstrapAddress) {
-		this.bootstrapAddress = bootstrapAddress;
-		joinNetwork();
-		createServer();
+		if (args.length == 0)
+			System.err.println("Specify the bootstrap address");
+		else {
+			bootstrapAddress = args[0];
+			joinNetwork();
+			new PacketListener().start();
+			waitForMessage();
+		}
 	}
 
-	public ERRANode(String bootstrapAddress, String fileName) {
-		this.bootstrapAddress = bootstrapAddress;
-		joinNetwork();
-		sendFile(fileName);
-		createServer();
-	}
-
-	private void waitForMessage() {
-    	String name ="";
+	private static void waitForMessage() {
+    	String name = "";
     	Scanner in = new Scanner(System.in);
     	
     	while (!(name.equals("/logout"))) {
@@ -88,10 +68,9 @@ public class ERRANode {
     	
     	in.close();
     	disconnectFromNetwork();
-    	
-    	}	
+    }
 	
-	private void joinNetwork() {
+	private static void joinNetwork() {
 		Socket bootstrapSocket = null;
 		try {
 			bootstrapSocket = new Socket(bootstrapAddress, 10000);
@@ -109,7 +88,7 @@ public class ERRANode {
 		}
 	}
 
-	private void disconnectFromNetwork() {
+	private static void disconnectFromNetwork() {
 		Socket bootstrapSocket = null;
 		try {
 			bootstrapSocket = new Socket(bootstrapAddress, 10000);
@@ -127,35 +106,7 @@ public class ERRANode {
 		}
 	}
 
-	private void createServer() {
-		ServerSocket server = null;
-		try {
-			server = new ServerSocket(10000);
-		} catch (IOException e) {
-			System.err.println("Problem creating this node's server\n" + e.toString());
-		}
-
-		while (true) {
-			System.out.println("Waiting for packets");
-			Socket inputSocket = null;
-			try {
-				inputSocket = server.accept();
-				DataInputStream input = new DataInputStream(inputSocket.getInputStream());
-				System.out.println("A new packet has arrived");
-				forwardPacket(input);
-			} catch (IOException e) {
-
-			} finally {
-				try {
-					inputSocket.close();
-				} catch (IOException e) {
-
-				}
-			}
-		}
-	}
-
-	private void sendFile(String fileName) {
+	private static void sendFile(String fileName) {
 		Socket bootstrapSocket = null;
 		Socket outputSocket = null;
 		try {
@@ -208,28 +159,72 @@ public class ERRANode {
 		}
 	}
 
-	private void forwardPacket(DataInputStream input) throws IOException {
-		byte remainingNodesNum = input.readByte();
-		System.out.println("This packets's remaining nodes: " + (remainingNodesNum & 0xFF));
-		if (remainingNodesNum == 0) {
-			System.out.println("Packet reached the destination");
-			return;
+	private static class PacketListener extends Thread {
+
+		public void run() {
+			ServerSocket server = null;
+			try {
+				server = new ServerSocket(10000);
+			} catch (IOException e) {
+				System.err.println("Problem creating this node's server\n" + e.toString());
+			}
+
+			while (true) {
+				System.out.println("Waiting for packets");
+				Socket inputSocket = null;
+				try {
+					inputSocket = server.accept();
+					System.out.println("A new packet has arrived");
+					new PacketForwarder(inputSocket).start();
+				} catch (IOException e) {
+
+				}
+			}
+		}
+	}
+
+	private static class PacketForwarder extends Thread {
+
+		private Socket inputSocket;
+		
+		public PacketForwarder(Socket inputSocket) {
+			this.inputSocket = inputSocket;
 		}
 
-		byte[] nextHopAddress = new byte[4];
-		input.read(nextHopAddress);
+		public void run() {
+			try {
+				DataInputStream input = new DataInputStream(inputSocket.getInputStream());
+				byte remainingNodesNum = input.readByte();
+				System.out.println("This packet's remaining nodes: " + (remainingNodesNum & 0xFF));
+				if (remainingNodesNum == 0) {
+					System.out.println("Packet reached the destination");
+					return;
+				}
 
-		Socket outputSocket = new Socket(InetAddress.getByAddress(nextHopAddress), 10000);
-		DataOutputStream output = new DataOutputStream(outputSocket.getOutputStream());
+				byte[] nextHopAddress = new byte[4];
+				input.read(nextHopAddress);
 
-		output.writeByte(remainingNodesNum - 1);
-		byte[] buffer = new byte[1024];    // 1024 è un numero a caso, questa parte si può migliorare
-		int len;
-		while ((len = input.read(buffer)) > 0)
-			output.write(buffer, 0, len);
+				Socket outputSocket = new Socket(InetAddress.getByAddress(nextHopAddress), 10000);
+				DataOutputStream output = new DataOutputStream(outputSocket.getOutputStream());
 
-		outputSocket.close();
-		System.out.println("Packet forwarded");
+				output.writeByte(remainingNodesNum - 1);
+				byte[] buffer = new byte[1024];    // 1024 è un numero a caso, questa parte si può migliorare
+				int len;
+				while ((len = input.read(buffer)) > 0)
+					output.write(buffer, 0, len);
+
+				outputSocket.close();
+				System.out.println("Packet forwarded");
+			} catch (IOException e) {
+
+			} finally {
+				try {
+					inputSocket.close();
+				} catch (IOException e) {
+
+				}
+			}
+		}
 	}
 
 }
