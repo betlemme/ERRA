@@ -49,13 +49,19 @@ public class ERRANode {
 	private String bootstrapAddress;
 
 	public static void main(String[] args) {
-		if (args.length == 0)
-			System.err.println("Specify the bootstrap address");
-		else if (args.length == 1)
-			new ERRANode(args[0]);
-		else
-			new ERRANode(args[0], args[1]);
-	}
+            
+        	
+        	if (args.length == 0)
+                        System.err.println("Specify the bootstrap address");
+                else if (args.length == 1) {
+                        ERRANode nodo = new ERRANode(args[0]);
+                        nodo.waitForMessage();
+                		}
+                	else {
+                		ERRANode nodo = new ERRANode(args[0], args[1]);
+                		nodo.waitForMessage();
+                	}
+        }
 
 	public ERRANode(String bootstrapAddress) {
 		this.bootstrapAddress = bootstrapAddress;
@@ -70,6 +76,21 @@ public class ERRANode {
 		createServer();
 	}
 
+	private void waitForMessage() {
+    	String nome ="";
+    	Scanner in = new Scanner(System.in);
+    	
+    	while (!(nome.equals("/logout"))) {
+    		System.out.print("Nome file da mandare (/logout per disconnettersi): ");
+    		nome = in.nextLine();
+    		sendFile(nome);
+    	}
+    	
+    	in.close();
+    	disconnectFromNetwork();
+    	
+    	}	
+	
 	private void joinNetwork() {
 		Socket bootstrapSocket = null;
 		try {
