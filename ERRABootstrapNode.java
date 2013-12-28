@@ -3,8 +3,6 @@
 import java.net.*;
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Random;
 
 public class ERRABootstrapNode {
 
@@ -18,6 +16,10 @@ public class ERRABootstrapNode {
 
 	public static void main(String[] args) {
 		new PacketListener().start();
+	}
+
+	private static void sendFile() {
+		// TODO
 	}
 
 	private static class PacketListener extends Thread {
@@ -36,59 +38,37 @@ public class ERRABootstrapNode {
 				try {
 					inputSocket = server.accept();
 					System.out.println("A new packet has arrived");
-					new PacketHandler(inputSocket).start();
+					DataInputStream input = new DataInputStream(inputSocket.getInputStream());
+
+					byte firstByte = input.readByte();
+					switch (firstByte & 0xFF) {      // conversione a byte senza segno
+						case CONNECTION_CODE:
+							addNode(inputSocket);
+							break;
+						case DISCONNECTION_CODE:
+							removeNode(inputSocket);
+							break;
+						case ADDRESSES_LIST_REQUEST_CODE:
+							sendAddressesList(inputSocket);
+							break;
+						case BOOTSTRAP_RESPONSE_SUCCESS_CODE:      // questo caso si può anche togliere, l'ho messo per debug
+							System.err.println("This should never happen");  
+							break;
+						case BOOTSTRAP_RESPONSE_ERROR_CODE:        // questo caso si può anche togliere, l'ho messo per debug
+							System.err.println("This should never happen");  
+							break;
+						default:
+							forwardPacket(input, firstByte);
+							break;
+					}
 				} catch (IOException e) {
-
-				} 
-			}
-		}
-
-	}
-
-	private void sendFile() {
-		// TODO
-	}
-
-	private static class PacketHandler extends Thread {
-
-		private Socket inputSocket;
-		
-		public PacketHandler(Socket inputSocket) {
-			this.inputSocket = inputSocket;
-		}
-
-		public void run() {
-			try {
-				DataInputStream input = new DataInputStream(inputSocket.getInputStream());
-
-				byte firstByte = input.readByte();
-				switch (firstByte & 0xFF) {      // conversione a byte senza segno
-					case CONNECTION_CODE:
-						addNewNode();
-						break;
-					case DISCONNECTION_CODE:
-						removeNode();
-						break;
-					case ADDRESSES_LIST_REQUEST_CODE:
-						sendAddressesList();
-						break;
-					case BOOTSTRAP_RESPONSE_SUCCESS_CODE:      // questo caso si può anche togliere, l'ho messo per debug
-						System.err.println("This should never happen");  
-						break;
-					case BOOTSTRAP_RESPONSE_ERROR_CODE:        // questo caso si può anche togliere, l'ho messo per debug
-						System.err.println("This should never happen");  
-						break;
-					default:
-						forwardPacket(input, firstByte);
-						break;
-				}
-			} catch (IOException e) {
-
-			} finally {
-				try {
-					inputSocket.close();
-				} catch (IOException e) {
-
+					e.printStackTrace();
+				} finally {
+					try {
+						inputSocket.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
@@ -116,7 +96,7 @@ public class ERRABootstrapNode {
 			System.out.println("Packet forwarded");
 		}
 
-		private void addNewNode() throws IOException {
+		private void addNode(Socket inputSocket) throws IOException {
 			InetAddress newNodeAddress = inputSocket.getInetAddress();
 			if (addressesList.isEmpty())
 				addressesList.add(inputSocket.getLocalAddress());  // il primo nodo che si connette alla rete permette al bootstrap
@@ -126,20 +106,18 @@ public class ERRABootstrapNode {
 			System.out.println("Node with address " +  newNodeAddress.getHostAddress() + " added to the network");
 		}
 
-		private void removeNode() throws IOException {
+		private void removeNode(Socket inputSocket) throws IOException {
 			InetAddress removedNodeAddress = inputSocket.getInetAddress();
 			addressesList.remove(removedNodeAddress);
 			System.out.println("Node with address " +  removedNodeAddress.getHostAddress() + " removed from the network");
 		}
 
-		private void sendAddressesList() throws IOException {
+		private void sendAddressesList(Socket inputSocket) throws IOException {
 			byte[] destinationAddress = new byte[4];
 			DataInputStream input = new DataInputStream(inputSocket.getInputStream());
 			input.read(destinationAddress);
 			InetAddress destination = InetAddress.getByAddress(destinationAddress);
 			InetAddress source = inputSocket.getInetAddress();
-
-			Collections.shuffle(addressesList, new Random(System.nanoTime()));
 			
 			DataOutputStream output = new DataOutputStream(inputSocket.getOutputStream());
 			if (!addressesList.contains(destination)) {
@@ -148,15 +126,13 @@ public class ERRABootstrapNode {
 			}
 			System.out.println("Sending addresses list to node " + source.getHostAddress());
 			output.writeByte(BOOTSTRAP_RESPONSE_SUCCESS_CODE);
-			output.writeByte(addressesList.size() - 1);
 			// mette nella lista tutti gli indirizzi tranne quello della sorgente e quello della destinazione
 			for (InetAddress address : addressesList) {
 				if (!address.equals(source) && !address.equals(destination))
 					output.write(address.getAddress(), 0, 4);
 			}
-			// mette in fondo alla lista l'indirizzo della destinazione
-			output.write(destination.getAddress(), 0, 4);
 		}
+
 
 	}
 

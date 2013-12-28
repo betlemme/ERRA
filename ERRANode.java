@@ -17,9 +17,6 @@ Pacchetto per richiedere la lista dei nodi al bootstrap:
 
 Pacchetto di risposta dal bootstrap con la lista di indirizzi in ordine casuale:
 		1 byte con valore 254;
-		1 byte che indica il numero di indirizzi nella lista; (non sarebbe strettamente necessario ma semplifica il codice, 
-															   perché il nodo sorgente può inoltrare direttamente la lista al 
-															   prossimo nodo senza prima leggerla tutta per sapere quanto è lunga)
 		lista di indirizzi
 
 Pacchetto di risposta dal bootstrap che indica che il nodo destinazione richiesto non esiste nella rete:
@@ -32,6 +29,9 @@ Pacchetto di risposta dal bootstrap che indica che il nodo destinazione richiest
 
 import java.net.*;
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Random;
 import java.util.Scanner;
 
 public class ERRANode {
@@ -83,7 +83,7 @@ public class ERRANode {
 				if (bootstrapSocket != null)
 					bootstrapSocket.close();
 			} catch (IOException e) {
-
+				e.printStackTrace();
 			}
 		}
 	}
@@ -101,62 +101,82 @@ public class ERRANode {
 				if (bootstrapSocket != null)
 					bootstrapSocket.close();
 			} catch (IOException e) {
-
+				e.printStackTrace();
 			}
 		}
 	}
 
 	private static void sendFile(String fileName) {
-		Socket bootstrapSocket = null;
 		Socket outputSocket = null;
 		try {
-			// Richiesta della lista di indirizzi al bootstrap
-			bootstrapSocket = new Socket(bootstrapAddress, 10000);
-			DataOutputStream bootstrapOutput = new DataOutputStream(bootstrapSocket.getOutputStream());
-			bootstrapOutput.writeByte(ADDRESSES_LIST_REQUEST_CODE);
 			InetAddress destination = InetAddress.getByName(fileName);
-			bootstrapOutput.write(destination.getAddress(), 0, 4);
-			
-			DataInputStream input = new DataInputStream(bootstrapSocket.getInputStream());
-			byte firstByte = input.readByte();
-			if ((firstByte & 0xFF) == BOOTSTRAP_RESPONSE_ERROR_CODE) {
+			ArrayList<InetAddress> addressesList = requestAddressesList(destination);
+			if (addressesList == null) {
 				System.out.println("The specified destination is not connected to the ERRA network");
 				return;
 			}
 
-			// Invio dell'header del pacchetto al prossimo nodo
-			byte remainingNodesNum = input.readByte();
-			byte[] nextHopAddress = new byte[4];
-			input.read(nextHopAddress);
+			// quando divideremo i file in pezzi tutto il codice qua sotto andrà ripetuto per ogni pezzo 
+			Collections.shuffle(addressesList, new Random(System.nanoTime()));
+			InetAddress nextNode = addressesList.remove(addressesList.size() - 1);
+			addressesList.add(destination);   // mette in fondo alla lista l'indirizzo della destinazione
 
-			outputSocket = new Socket(InetAddress.getByAddress(nextHopAddress), 10000);
+			outputSocket = new Socket(nextNode, 10000);
 			DataOutputStream output = new DataOutputStream(outputSocket.getOutputStream());
 
-			output.writeByte(remainingNodesNum - 1);
+			output.writeByte(addressesList.size());
+			for (InetAddress nodeAddress : addressesList)
+				output.write(nodeAddress.getAddress(), 0, 4);   // ogni indirizzo viene mandato come gruppo di 4 byte
+
+			// invio del file al prossimo nodo
 			byte[] buffer = new byte[1024];     // 1024 è un numero a caso, questa parte si può migliorare
 			int len;
-			while ((len = input.read(buffer)) > 0)
-				output.write(buffer, 0, len);
-
-			// Invio del file al prossimo nodo
 			FileInputStream fis = new FileInputStream(new File(fileName));
 			while ((len = fis.read(buffer)) > 0)
 				output.write(buffer, 0, len);
-
-			outputSocket.close();
 		} catch (IOException e) {
-			System.err.println("Problem sending file " + e.toString());
+			System.err.println("Problem sending file");
 			return;
+		} finally {
+			try {
+				if (outputSocket != null)
+					outputSocket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private static ArrayList<InetAddress> requestAddressesList(InetAddress destination) {
+		Socket bootstrapSocket = null;
+		ArrayList<InetAddress> addressesList = new ArrayList<InetAddress>();
+		try {
+			bootstrapSocket = new Socket(bootstrapAddress, 10000);
+			DataOutputStream bootstrapOutput = new DataOutputStream(bootstrapSocket.getOutputStream());
+			bootstrapOutput.writeByte(ADDRESSES_LIST_REQUEST_CODE);
+			bootstrapOutput.write(destination.getAddress(), 0, 4);
+			
+			DataInputStream input = new DataInputStream(bootstrapSocket.getInputStream());
+			byte firstByte = input.readByte();
+			if ((firstByte & 0xFF) == BOOTSTRAP_RESPONSE_ERROR_CODE)
+				return null;  // la destinazione non esiste
+
+			byte[] buffer = new byte[4];
+			int len;
+			while ((len = input.read(buffer)) > 0) {
+				addressesList.add(InetAddress.getByAddress(buffer));
+			}
+		} catch (IOException e) {
+			System.err.println("Problem requesting addresses list to bootstrap");
 		} finally {
 			try {
 				if (bootstrapSocket != null)
 					bootstrapSocket.close();
-				if (outputSocket != null)
-					outputSocket.close();
 			} catch (IOException e) {
-
+				e.printStackTrace();
 			}
 		}
+		return addressesList;
 	}
 
 	private static class PacketListener extends Thread {
@@ -166,7 +186,7 @@ public class ERRANode {
 			try {
 				server = new ServerSocket(10000);
 			} catch (IOException e) {
-				System.err.println("Problem creating this node's server\n" + e.toString());
+				System.err.println("Problem creating this node's server");
 			}
 
 			while (true) {
@@ -175,35 +195,34 @@ public class ERRANode {
 				try {
 					inputSocket = server.accept();
 					System.out.println("A new packet has arrived");
-					new PacketForwarder(inputSocket).start();
-				} catch (IOException e) {
 
+					DataInputStream input = new DataInputStream(inputSocket.getInputStream());
+					byte firstByte = input.readByte();
+					if (firstByte == 0) {
+						System.out.println("Packet reached the destination");
+						saveFileFragment(input);
+					} else {
+						forwardPacket(input, firstByte);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				} finally {
+					try {
+						inputSocket.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
-	}
 
-	private static class PacketForwarder extends Thread {
-
-		private Socket inputSocket;
-		
-		public PacketForwarder(Socket inputSocket) {
-			this.inputSocket = inputSocket;
-		}
-
-		public void run() {
+		private void forwardPacket(DataInputStream input, byte remainingNodesNum) {
 			try {
-				DataInputStream input = new DataInputStream(inputSocket.getInputStream());
-				byte remainingNodesNum = input.readByte();
 				System.out.println("This packet's remaining nodes: " + (remainingNodesNum & 0xFF));
-				if (remainingNodesNum == 0) {
-					System.out.println("Packet reached the destination");
-					return;
-				}
 
 				byte[] nextHopAddress = new byte[4];
 				input.read(nextHopAddress);
-
+				System.out.println(InetAddress.getByAddress(nextHopAddress));
 				Socket outputSocket = new Socket(InetAddress.getByAddress(nextHopAddress), 10000);
 				DataOutputStream output = new DataOutputStream(outputSocket.getOutputStream());
 
@@ -216,15 +235,14 @@ public class ERRANode {
 				outputSocket.close();
 				System.out.println("Packet forwarded");
 			} catch (IOException e) {
-
-			} finally {
-				try {
-					inputSocket.close();
-				} catch (IOException e) {
-
-				}
+				e.printStackTrace();
 			}
 		}
+
+		private void saveFileFragment(DataInputStream input) {
+			// qua va il codice per salvare i pezzi di file
+		}
+
 	}
 
 }
