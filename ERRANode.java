@@ -246,19 +246,29 @@ public class ERRANode {
 		}
 
 		private void saveFileFragment(DataInputStream input, String name) {
-			
-			FileOutputStream fos = new FileOutputStream("/home/ERRA/" + name);
-			byte[] buf = new byte[1500]; //qui dipende da quanto facciamo i sottomessaggi
-        	      	int i = 0;
-        	      	// riga per riga leggo il file originale per 
-        	      	// scriverlo nello stram del file destinazione
-        	      	while((i=input.read(buf))!=-1) {
-        	          	fos.write(buf, 0, i);
-        	      	}
-        	      	// chiudo gli strams
-        	      	fos.close();
-			
-			System.out.println("file salvato in /home/ERRA/" + name);
+			FileOutputStream fos = null;
+			try {
+				fos = new FileOutputStream("/home/ERRA/" + name);
+				byte[] buf = new byte[1500]; //qui dipende da quanto facciamo i sottomessaggi
+				int i = 0;
+				// riga per riga leggo il file originale per 
+				// scriverlo nello stram del file destinazione
+				while ((i=input.read(buf)) != -1) {
+					fos.write(buf, 0, i);
+				}
+				// chiudo gli strams
+				fos.close();
+
+				System.out.println("file salvato in /home/ERRA/" + name);
+			} catch (IOException e) {
+				e.printStackTrace();
+			} finally {
+				try {
+					fos.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 
 	}
