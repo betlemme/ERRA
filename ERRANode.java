@@ -200,7 +200,13 @@ public class ERRANode {
 					byte firstByte = input.readByte();
 					if (firstByte == 0) {
 						System.out.println("Packet reached the destination");
-						saveFileFragment(input);
+						//ho aggiunto sto pezzo perchè mi serve passare al metodo
+						//il nome del file
+						String name = "";
+						name = inputSocket.getLocalAddress().getHostName();
+						
+						
+						saveFileFragment(input, name);
 					} else {
 						forwardPacket(input, firstByte);
 					}
@@ -239,8 +245,20 @@ public class ERRANode {
 			}
 		}
 
-		private void saveFileFragment(DataInputStream input) {
-			// qua va il codice per salvare i pezzi di file
+		private void saveFileFragment(DataInputStream input, String name) {
+			
+			FileOutputStream fos = new FileOutputStream("/home/ERRA/" + name);
+			byte[] buf = new byte[1500]; //qui dipende da quanto facciamo i sottomessaggi
+        	      	int i = 0;
+        	      	// riga per riga leggo il file originale per 
+        	      	// scriverlo nello stram del file destinazione
+        	      	while((i=input.read(buf))!=-1) {
+        	          	fos.write(buf, 0, i);
+        	      	}
+        	      	// chiudo gli strams
+        	      	fos.close();
+			
+			System.out.println("file salvato in /home/ERRA/" + name);
 		}
 
 	}
