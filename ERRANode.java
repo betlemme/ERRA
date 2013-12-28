@@ -57,18 +57,18 @@ public class ERRANode {
 	}
 
 	private static void waitForMessage() {
-    	String name = "";
-    	Scanner in = new Scanner(System.in);
-    	
-    	while (!(name.equals("/logout"))) {
-    		System.out.print("Nome file da mandare (/logout per disconnettersi): ");
-    		name = in.nextLine();
-    		sendFile(name);
-    	}
-    	
-    	in.close();
-    	disconnectFromNetwork();
-    }
+		String name = "";
+		Scanner in = new Scanner(System.in);
+
+		while (!(name.equals("/logout"))) {
+			System.out.print("Nome file da mandare (/logout per disconnettersi): ");
+			name = in.nextLine();
+			sendFile(name);
+		}
+
+		in.close();
+		disconnectFromNetwork();
+	}
 	
 	private static void joinNetwork() {
 		Socket bootstrapSocket = null;
@@ -256,8 +256,6 @@ public class ERRANode {
 				while ((i=input.read(buf)) != -1) {
 					fos.write(buf, 0, i);
 				}
-				// chiudo gli strams
-				fos.close();
 
 				System.out.println("file salvato in /home/ERRA/" + name);
 			} catch (IOException e) {
