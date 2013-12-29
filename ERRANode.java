@@ -115,7 +115,31 @@ public class ERRANode {
 				System.out.println("The specified destination is not connected to the ERRA network");
 				return;
 			}
-
+			
+			/////////////////////////////////////////////////////////////////////////////////////
+			File[] pktMSG = new File[10]; //da rivedere anche in base al merge e alla dim di msg
+			File f = new File(fileName);
+			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(f));
+			FileOutputStream out;
+			String name = f.getName();
+			int partCounter = 0;
+			int sizeOfFiles = 1500;// questo è da stabilire vediamo
+			byte[] buffer = new byte[sizeOfFiles];
+			int tmp = 0;
+			while ((tmp = bis.read(buffer)) > 0) {
+			 File newFile=new File(fileName+"."+String.format("%03d", partCounter));
+			 newFile.createNewFile();
+			 out = new FileOutputStream(newFile);
+			 out.write(buffer,0,tmp);
+			 pktMSG[partCounter] = newFile;
+			 partCounter++;
+			 out.close();
+			}
+			
+			//////////////per ogni file di pktMSG://///////////////////////777////
+			//for (int i=0 to partCounter -1) {
+			////////////////////////////////////////////////////////////////////
+			
 			// quando divideremo i file in pezzi tutto il codice qua sotto andrà ripetuto per ogni pezzo 
 			Collections.shuffle(addressesList, new Random(System.nanoTime()));
 			InetAddress nextNode = addressesList.remove(addressesList.size() - 1);
