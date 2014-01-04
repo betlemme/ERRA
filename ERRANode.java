@@ -144,10 +144,13 @@ public class ERRANode {
 			
 			//////////////per ogni file di pktMSG://///////////////////////777////
 			//for (File pkt : pktMSG) {
-			////////////////////////////////////////////////////////////////////
 			
+			/*
+			String pktName = pkt.getName();
+			String numberPKT = filename.split("\\.")[1];
+			
+			*/
 			// quando divideremo i file in pezzi tutto il codice qua sotto andrà ripetuto per ogni pezzo 
-			
 			InetAddress nextNode = addressesList.remove(addressesList.size() - 1);//l'ho invertita con la riga sotto
 			Collections.shuffle(addressesList, new Random(System.nanoTime()));
 			addressesList.add(destination);   // mette in fondo alla lista l'indirizzo della destinazione
@@ -156,6 +159,15 @@ public class ERRANode {
 			DataOutputStream output = new DataOutputStream(outputSocket.getOutputStream());
 
 			output.writeByte(addressesList.size());
+			/*  dopo il primo BYTE, mando l'IP del nodo trasmettente, il num di messaggiinviati, 
+			il num del pkt e il num pkt totale di quel MSG
+			
+			output.write(myIP.getAddress(), 0, 4);
+			output.writeByte(numberMSGSent);
+			output.writeByte(Integer.parseInt(numberPKT));
+			output.writeByte(partCounter-1);
+			
+			*/
 			for (InetAddress nodeAddress : addressesList)
 				output.write(nodeAddress.getAddress(), 0, 4);   // ogni indirizzo viene mandato come gruppo di 4 byte
 
