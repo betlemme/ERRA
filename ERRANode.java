@@ -43,6 +43,9 @@ public class ERRANode {
 	private static final int BOOTSTRAP_RESPONSE_ERROR_CODE = 255;
 
 	private static String bootstrapAddress;
+	
+	private InetAddress myIP = InetAddress.getLocalHost();
+	private int numberMSGSEnt = 0;
 
 	public static void main(String[] args) {          
         	
@@ -107,6 +110,9 @@ public class ERRANode {
 	}
 
 	private static void sendFile(String fileName) {
+		
+		numberMSGSent++;
+		
 		Socket outputSocket = null;
 		try {
 			InetAddress destination = InetAddress.getByName(fileName);
@@ -141,8 +147,9 @@ public class ERRANode {
 			////////////////////////////////////////////////////////////////////
 			
 			// quando divideremo i file in pezzi tutto il codice qua sotto andrà ripetuto per ogni pezzo 
+			
+			InetAddress nextNode = addressesList.remove(addressesList.size() - 1);//l'ho invertita con la riga sotto
 			Collections.shuffle(addressesList, new Random(System.nanoTime()));
-			InetAddress nextNode = addressesList.remove(addressesList.size() - 1);
 			addressesList.add(destination);   // mette in fondo alla lista l'indirizzo della destinazione
 
 			outputSocket = new Socket(nextNode, 10000);
