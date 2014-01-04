@@ -117,7 +117,7 @@ public class ERRANode {
 			}
 			
 			/////////////////////////////////////////////////////////////////////////////////////
-			File[] pktMSG = new File[10]; //da rivedere anche in base al merge e alla dim di msg
+			ArrayLyst<File> pktMSG = new ArrayList<File>(); //da rivedere anche in base al merge e alla dim di msg
 			File f = new File(fileName);
 			BufferedInputStream bis = new BufferedInputStream(new FileInputStream(f));
 			FileOutputStream out;
@@ -131,13 +131,13 @@ public class ERRANode {
 			 newFile.createNewFile();
 			 out = new FileOutputStream(newFile);
 			 out.write(buffer,0,tmp);
-			 pktMSG[partCounter] = newFile;
+			 pktMSG.add(newFile);
 			 partCounter++;
 			 out.close();
 			}
 			
 			//////////////per ogni file di pktMSG://///////////////////////777////
-			//for (int i=0 to partCounter -1) {
+			//for (File pkt : pktMSG) {
 			////////////////////////////////////////////////////////////////////
 			
 			// quando divideremo i file in pezzi tutto il codice qua sotto andrà ripetuto per ogni pezzo 
